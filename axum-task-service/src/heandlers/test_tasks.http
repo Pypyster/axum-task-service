@@ -1,0 +1,76 @@
+@baseUrl = http://localhost:3000
+
+### Получить список всех задач
+GET {{baseUrl}}/tasks
+
+### Создать новую задачу
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+
+{
+  "name": "Купить молоко",
+  "status": "pending"
+}
+
+### Создать ещё одну задачу 
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+
+{
+  "name": "Сделать домашку по Rust",
+  "status": "in_process"
+}
+
+### Получить одну задачу по id 
+GET {{baseUrl}}/tasks/3
+
+### Получить задачу с несуществующим id 
+GET {{baseUrl}}/tasks/9999
+
+### Частично обновить задачу — только статус
+PATCH {{baseUrl}}/tasks/1
+Content-Type: application/json
+
+{
+  "status": "done"
+}
+
+### Частично обновить задачу — только имя
+PATCH {{baseUrl}}/tasks/1
+Content-Type: application/json
+
+{
+  "name": "Купить молоко и хлеб"
+}
+
+### Обновить оба поля сразу
+PATCH {{baseUrl}}/tasks/4
+Content-Type: application/json
+
+{
+  "name": "Купить молоко и хлеб",
+  "status": "cancel"
+}
+
+### Обновить несуществующую задачу 
+PATCH {{baseUrl}}/tasks/9999
+Content-Type: application/json
+
+{
+  "status": "done"
+}
+
+### Удалить задачу по id
+DELETE {{baseUrl}}/tasks/2
+
+### Удалить несуществующую задачу 
+DELETE {{baseUrl}}/tasks/9999
+
+### Проверка невалидного статуса 
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+
+{
+  "name": "Тестовая задача",
+  "status": "unknown_status"
+}
