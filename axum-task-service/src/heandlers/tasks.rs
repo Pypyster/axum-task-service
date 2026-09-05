@@ -1,182 +1,151 @@
+use axum::{
+    Extension, Json,
+    extract::{Path, State},
+    http::StatusCode,
+    response::IntoResponse,
+};
+use sqlx::PgPool;
 
-use axum::extract::{Path};
-use axum::http::StatusCode;
-use axum::{extract::State, response::IntoResponse, Json};
-use chrono::Utc;
-use sea_orm::{ActiveModelTrait, EntityTrait, ModelTrait};
-use sea_orm::ActiveValue::{NotSet, Set};
-use sea_orm::DatabaseConnection;
+use crate::{
+    db::task::{
+        create_task, delete_task, find_task_by_id, find_task_by_id_and_user_id, get_all_tasks, get_tasks_by_user_id, update_all_task, update_task_status_for_user,
+    }, structs::{
+        claims::Claims,
+        task::{CreateTaskRequest, UpdateTaskRequest},
+        user_role::UserRole,
+    },
+};
 
-use crate::structs::task::{CreateTaskRequest, Task, UpdateTaskRequest};
-use crate::entities::tasks::ActiveModel as TaskActiveModel;
-use crate::entities::tasks::Entity as TaskEntity;
-
-pub async fn create_task(
-    State(pool): State<DatabaseConnection>,
-    Json(req): Json<CreateTaskRequest>,
+pub async fn get_all_tasks_handler(
+    State(pool): State<PgPool>,
+    Extension(claims): Extension<Claims>,
 ) -> impl IntoResponse {
-    let now = chrono::Utc::now();
-
-    let new_task = TaskActiveModel {
-        id: NotSet,
-        name: Set(req.name),
-        status: Set(req.status.into()),
-        created_at: Set(now.into()),
-        updated_at: Set(now.into()),
+    let result = if claims.role == UserRole::Admin {
+        get_all_tasks(&pool).await
+    } else {
+        get_tasks_by_user_id(&pool, claims.sub).await
     };
 
-    match new_task.insert(&pool).await {
-        Ok(model) => match Task::try_from(model) {
-            Ok(task) => (StatusCode::CREATED, Json(task)).into_response(),
-            Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err).into_response(),
-        },
-        Err(err) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to create task: {err}"),
-        )
-            .into_response(),
-    }
-}
-
-pub async fn get_all_tasks(
-    State(pool): State<DatabaseConnection>,
-) -> impl IntoResponse {
-    let models = match TaskEntity::find().all(&pool).await {
-        Ok(models) => models,
-        Err(err) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to fetch tasks: {err}"),
-            )
-                .into_response();
-        }
-    };
-
-    let tasks: Result<Vec<Task>, String> = models.into_iter().map(Task::try_from).collect();
-
-    match tasks {
+    match result {
         Ok(tasks) => (StatusCode::OK, Json(tasks)).into_response(),
-        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err).into_response(),
+
+        Err(err) => {
+            eprintln!("Failed to get tasks: {err}");
+
+            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to load tasks").into_response()
+        }
     }
 }
 
-pub async fn get_one_task(
-    State(pool): State<DatabaseConnection>,
+pub async fn get_task_handler(
+    State(pool): State<PgPool>,
+    Extension(claims): Extension<Claims>,
     Path(id): Path<i32>,
 ) -> impl IntoResponse {
-    let task_bd = match TaskEntity::find_by_id(id).one(&pool).await {
-        Ok(task) => task,
+    let result = if claims.role == UserRole::Admin {
+        find_task_by_id(&pool, id).await
+    } else {
+        find_task_by_id_and_user_id(&pool, id, claims.sub).await
+    };
+
+    match result {
+        Ok(Some(task)) => (StatusCode::OK, Json(task)).into_response(),
+
+        Ok(None) => {
+            let msg = format!("No available task with id: {id}");
+            (StatusCode::NOT_FOUND, msg).into_response()
+        }
+
         Err(err) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to fetch task: {err}"),
-            )
-                .into_response();
-        }
-    };
+            eprintln!("Failed to get task: {err}");
 
-    let model = match task_bd {
-        Some(model) => model,
-        None => {
-            return (
-                StatusCode::NOT_FOUND,
-                format!("Task with id {id} not found"),
-            )
-                .into_response();
+            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to load task").into_response()
         }
-    };
-
-    match Task::try_from(model) {
-        Ok(task) => (StatusCode::OK, Json(task)).into_response(),
-        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err).into_response(),
     }
 }
 
-pub async fn delete_task(
-    State(pool): State<DatabaseConnection>,
-    Path(id): Path<i32>,
+pub async fn create_task_handler(
+    State(pool): State<PgPool>,
+    Extension(claims): Extension<Claims>,
+    Json(task): Json<CreateTaskRequest>,
 ) -> impl IntoResponse {
-    let task_bd = match TaskEntity::find_by_id(id).one(&pool).await {
-        Ok(task) => task,
+    if claims.role != UserRole::Admin {
+        return (StatusCode::FORBIDDEN, "Only admin can create tasks")
+            .into_response();
+    }
+
+    match create_task(&pool, task).await {
+        Ok(task) => (StatusCode::CREATED, Json(task)).into_response(),
+
         Err(err) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to fetch task: {err}"),
-            )
-                .into_response();
-        }
-    };
+            eprintln!("Failed to create task: {err}");
 
-    let model = match task_bd {
-        Some(model) => model,
-        None => {
-            return (
-                StatusCode::NOT_FOUND,
-                format!("Task with id {id} not found"),
-            )
-                .into_response();
+            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to create task")
+                .into_response()
         }
-    };
-
-    match model.delete(&pool).await {
-        Ok(_) => (StatusCode::OK, "Deleted Task").into_response(),
-        Err(err) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to delete task: {err}"),
-        )
-            .into_response(),
     }
 }
 
-pub async fn update_task(
-    State(pool): State<DatabaseConnection>, 
+pub async fn update_task_handler(
+    State(pool): State<PgPool>,
     Path(id): Path<i32>,
-    Json(req): Json<UpdateTaskRequest>
+    Extension(claims): Extension<Claims>,
+    Json(req): Json<UpdateTaskRequest>,
 ) -> impl IntoResponse {
-    let task_bd = match TaskEntity::find_by_id(id).one(&pool).await {
-        Ok(task) => task,
+    let result = if claims.role == UserRole::Admin {
+        update_all_task(&pool, req, id).await
+    } else {
+        if req.name.is_some() {
+            return (
+                StatusCode::FORBIDDEN,
+                "User can update only task status",
+            )
+                .into_response();
+        }
+
+        update_task_status_for_user(&pool, req, id, claims.sub).await
+    };
+
+    match result {
+        Ok(true) => (StatusCode::OK, "Task updated").into_response(),
+
+        Ok(false) => {
+            let msg = format!("No available task with id: {id}");
+            (StatusCode::NOT_FOUND, msg).into_response()
+        }
+
         Err(err) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to fetch task: {err}"),
-            )
-                .into_response();
+            eprintln!("Failed to update task: {err}");
+
+            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to update task")
+                .into_response()
         }
-    };
-
-    let model = match task_bd {
-        Some(model) => model,
-        None => {
-            return (
-                StatusCode::NOT_FOUND,
-                format!("Task with id {id} not found"),
-            )
-                .into_response();
-        }
-    };
-
-    let mut model_act: TaskActiveModel = model.into();
-
-    if let Some(name) = req.name {
-        model_act.name = Set(name);
-    };
-
-    if let Some(status) = req.status {
-        model_act.status = Set(status.into());
-    };
-
-    model_act.updated_at =Set(Utc::now().into());
-
-    match model_act.update(&pool).await {
-        Ok(updated) => match Task::try_from(updated) {
-            Ok(task) => (StatusCode::OK, Json(task)).into_response(),
-            Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err).into_response(),
-        },
-        Err(err) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to update task: {err}"),
-        )
-            .into_response(),
     }
-    
+}
+
+pub async fn delete_task_handler(
+    State(pool): State<PgPool>,
+    Extension(claims): Extension<Claims>,
+    Path(id): Path<i32>,
+) -> impl IntoResponse {
+    if claims.role != UserRole::Admin {
+        return (StatusCode::FORBIDDEN, "Only admin can delete tasks")
+            .into_response();
+    }
+
+    match delete_task(&pool, id).await {
+        Ok(true) => (StatusCode::OK, "Task deleted").into_response(),
+
+        Ok(false) => {
+            let msg = format!("No task with id: {id}");
+            (StatusCode::NOT_FOUND, msg).into_response()
+        }
+
+        Err(err) => {
+            eprintln!("Failed to delete task: {err}");
+
+            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to delete task")
+                .into_response()
+        }
+    }
 }
