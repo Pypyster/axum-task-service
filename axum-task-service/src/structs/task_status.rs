@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug,Clone,PartialEq,Eq,Serialize,Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskStatus {
     Pending,
@@ -9,7 +9,7 @@ pub enum TaskStatus {
     Cancel,
 }
 
-impl From<TaskStatus> for String  {
+impl From<TaskStatus> for String {
     fn from(value: TaskStatus) -> Self {
         match value {
             TaskStatus::Pending => "pending".to_string(),
