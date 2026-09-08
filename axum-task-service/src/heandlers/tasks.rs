@@ -6,17 +6,9 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
-use sqlx::PgPool;
 
 use crate::{
-    db::task::{
-        delete_task,get_all_tasks,
-        get_tasks_by_user_id,
-    },
-    errors::{DomainError, ServiceError},
-    repository::task_repository::NewTask,
-    service::task_service::TaskService,
-    structs::{
+    errors::{DomainError, ServiceError}, handlers::routes::AppState, repository::task_repository::NewTask, service::task_service::TaskService, structs::{
         claims::Claims,
         task::{CreateTaskRequest, UpdateTaskRequest},
         user_role::UserRole,
@@ -24,13 +16,13 @@ use crate::{
 };
 
 pub async fn get_all_tasks_handler(
-    State(task_service): State<Arc<TaskService>>,
+    State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
 ) -> impl IntoResponse {
     let result = if claims.role == UserRole::Admin {
-        task_service.get_all_tasks_as_admin().await
+        state.task_service.get_all_tasks_as_admin().await
     } else {
-       task_service.get_all_for_user(claims.sub).await
+        state.task_service.get_all_for_user(claims.sub).await
     };
 
     match result {
@@ -45,14 +37,14 @@ pub async fn get_all_tasks_handler(
 }
 
 pub async fn get_task_handler(
-    State(task_service): State<Arc<TaskService>>,
+    State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
     Path(id): Path<i32>,
 ) -> impl IntoResponse {
     let result = if claims.role == UserRole::Admin {
-        task_service.get_task_as_admin(id).await
+        state.task_service.get_task_as_admin(id).await
     } else {
-        task_service.get_task(id, claims.sub).await
+        state.task_service.get_task(id, claims.sub).await
     };
 
     match result {
@@ -60,19 +52,19 @@ pub async fn get_task_handler(
 
         Err(ServiceError::NotFound { .. }) => {
             let msg = format!("No available task with id: {id}");
-          (StatusCode::NOT_FOUND, msg).into_response()
+            (StatusCode::NOT_FOUND, msg).into_response()
         }
 
         Err(err) => {
             eprintln!("Failed to get task: {err}");
- 
+
             (StatusCode::INTERNAL_SERVER_ERROR, "Failed to load task").into_response()
         }
-    }  
+    }
 }
 
 pub async fn create_task_handler(
-    State(task_service): State<Arc<TaskService>>,
+    State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
     Json(task): Json<CreateTaskRequest>,
 ) -> impl IntoResponse {
@@ -86,10 +78,10 @@ pub async fn create_task_handler(
         status: task.status,
     };
 
-    match task_service.create_task(new_task).await {
+    match state.task_service.create_task(new_task).await {
         Ok(task) => (StatusCode::CREATED, Json(task)).into_response(),
 
-        Err(ServiceError::Domain(DomainError::EmptyName)) => {
+        Err(ServiceError::Domain(DomainError::EmptyTaskName)) => {
             (StatusCode::BAD_REQUEST, "Task name cannot be empty").into_response()
         }
 
@@ -102,15 +94,15 @@ pub async fn create_task_handler(
 }
 
 pub async fn update_task_handler(
-    State(task_service): State<Arc<TaskService>>,
+    State(state): State<Arc<AppState>>,
     Path(id): Path<i32>,
     Extension(claims): Extension<Claims>,
     Json(req): Json<UpdateTaskRequest>,
 ) -> impl IntoResponse {
     let result = if claims.role == UserRole::Admin {
-        task_service.update_all_task(id, req).await
+        state.task_service.update_all_task(id, req).await
     } else {
-        task_service
+        state.task_service
             .update_status_for_user(id, claims.sub, req)
             .await
     };
@@ -140,7 +132,7 @@ pub async fn update_task_handler(
 }
 
 pub async fn delete_task_handler(
-    State(task_service): State<Arc<TaskService>>,
+    State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
     Path(id): Path<i32>,
 ) -> impl IntoResponse {
@@ -148,7 +140,7 @@ pub async fn delete_task_handler(
         return (StatusCode::FORBIDDEN, "Only admin can delete tasks").into_response();
     }
 
-    match task_service.delete_task_as_admin(id).await {
+    match state.task_service.delete_task_as_admin(id).await {
         Ok(()) => (StatusCode::OK, "Task deleted").into_response(),
 
         Err(ServiceError::NotFound { .. }) => {
