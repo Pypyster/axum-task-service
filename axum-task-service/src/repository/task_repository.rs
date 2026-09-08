@@ -1,4 +1,4 @@
-use crate::structs::task::Task;
+use crate::structs::task::{Task, UpdateTaskRequest};
 use crate::structs::task_status::TaskStatus;
 use async_trait::async_trait;
 
@@ -20,5 +20,12 @@ pub trait TaskRepository: Send + Sync {
     ) -> Result<Option<Task>, sqlx::Error>;
     async fn get_all(&self) -> Result<Vec<Task>, sqlx::Error>;
     async fn get_by_user(&self, user_id: i32) -> Result<Vec<Task>, sqlx::Error>;
+    async fn update_all_task(&self, task: UpdateTaskRequest, id: i32) -> Result<bool, sqlx::Error>;
+    async fn update_status_for_user(
+        &self,
+        id: i32,
+        user_id: i32,
+        task: UpdateTaskRequest,
+    ) -> Result<bool, sqlx::Error>;
     async fn delete(&self, id: i32) -> Result<bool, sqlx::Error>;
 }
