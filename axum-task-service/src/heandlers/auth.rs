@@ -1,55 +1,42 @@
-use axum::Extension;
-use axum::extract::{Request, State};
-use axum::http::{StatusCode, header};
-use axum::middleware::Next;
-use axum::response::Response;
-use chrono::{Duration, Utc};
-use jsonwebtoken::{
-    DecodingKey, EncodingKey, Header, Validation, decode, encode, errors::Error as JwtError,
+use std::sync::Arc;
+
+use axum::{
+    extract::{Request, State}, http::{
+        StatusCode, header,
+    }, middleware::Next, response::Response,
 };
-use sqlx::PgPool;
+use jsonwebtoken::{
+    decode,
+    Algorithm,
+    DecodingKey,
+    Validation,
+    errors::Error as JwtError,
+};
 
-use crate::structs::claims::Claims;
-use crate::structs::user_role::UserRole;
+use crate::{handlers::routes::AppState, structs::{
+    claims::Claims,
+    user_role::UserRole,
+}};
 
-const TOKEN_LIFETIME_HOURS: i64 = 24;
-
-pub fn create_token(
-    user_id: i32, 
-    role: UserRole, 
-    jwt_secret: &str
-) -> Result<String, JwtError> {
-    let exp = (Utc::now() + Duration::hours(TOKEN_LIFETIME_HOURS)).timestamp() as usize;
-
-    let claims = Claims {
-        sub: user_id,
-        role,
-        exp,
-    };
-
-    encode(
-        &Header::default(),
-        &claims,
-        &EncodingKey::from_secret(jwt_secret.as_bytes()),
-    )
-}
-
-pub fn decode_token(
-    token: &str, 
-    jwt_secret: &str
+fn decode_token(
+    token: &str,
+    jwt_secret: &str,
 ) -> Result<Claims, JwtError> {
+    let validation = Validation::new(Algorithm::HS256);
+
     let token_data = decode::<Claims>(
         token,
         &DecodingKey::from_secret(jwt_secret.as_bytes()),
-        &Validation::default(),
+        &validation,
     )?;
 
     Ok(token_data.claims)
 }
 
 pub async fn auth_middleware(
-    mut request: Request, 
-    next: Next
+    State(state): State<Arc<AppState>>,
+    mut request: Request,
+    next: Next,
 ) -> Result<Response, StatusCode> {
     let authorization = request
         .headers()
@@ -61,19 +48,13 @@ pub async fn auth_middleware(
             Some(token) if !token.is_empty() => token,
             _ => return Err(StatusCode::UNAUTHORIZED),
         },
+
         None => return Err(StatusCode::UNAUTHORIZED),
     };
 
-    let jwt_secret = match std::env::var("JWT_SECRET") {
-        Ok(secret) => secret,
-        Err(_) => {
-            eprintln!("JWT_SECRET is not set");
-            return Err(StatusCode::INTERNAL_SERVER_ERROR);
-        }
-    };
-
-    let claims = match decode_token(token, &jwt_secret) {
+    let claims = match decode_token(token, state.jwt_secret.as_ref()) {
         Ok(claims) => claims,
+
         Err(_) => return Err(StatusCode::UNAUTHORIZED),
     };
 
@@ -83,10 +64,10 @@ pub async fn auth_middleware(
 }
 
 pub async fn admin_request(
-    req: Request,
+    request: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    let claims = match req.extensions().get::<Claims>() {
+    let claims = match request.extensions().get::<Claims>() {
         Some(claims) => claims,
         None => return Err(StatusCode::UNAUTHORIZED),
     };
@@ -95,5 +76,5 @@ pub async fn admin_request(
         return Err(StatusCode::FORBIDDEN);
     }
 
-    Ok(next.run(req).await)
+    Ok(next.run(request).await)
 }
