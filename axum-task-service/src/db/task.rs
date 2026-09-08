@@ -7,9 +7,7 @@ pub async fn get_pool() -> Result<PgPool, sqlx::Error> {
     PgPool::connect(&database_url).await
 }
 
-pub async fn create_table_tasks(
-    pool: &PgPool
-) -> Result<(), sqlx::Error> {
+pub async fn create_table_tasks(pool: &PgPool) -> Result<(), sqlx::Error> {
     sqlx::query(
         "
         CREATE TABLE IF NOT EXISTS tasks (
@@ -29,10 +27,7 @@ pub async fn create_table_tasks(
     Ok(())
 }
 
-pub async fn find_task_by_id(
-    pool: &PgPool,
-    id: i32
-) -> Result<Option<Task>, sqlx::Error> {
+pub async fn find_task_by_id(pool: &PgPool, id: i32) -> Result<Option<Task>, sqlx::Error> {
     sqlx::query_as::<_, Task>(
         "
         SELECT id, name, status, user_id, created_at, updated_at
@@ -63,10 +58,7 @@ pub async fn find_task_by_id_and_user_id(
     .await
 }
 
-pub async fn get_tasks_by_user_id(
-    pool: &PgPool,
-    user_id: i32
-) -> Result<Vec<Task>, sqlx::Error> {
+pub async fn get_tasks_by_user_id(pool: &PgPool, user_id: i32) -> Result<Vec<Task>, sqlx::Error> {
     sqlx::query_as::<_, Task>(
         "
         SELECT *
@@ -80,9 +72,7 @@ pub async fn get_tasks_by_user_id(
     .await
 }
 
-pub async fn get_all_tasks(
-    pool: &PgPool
-) -> Result<Vec<Task>, sqlx::Error> {
+pub async fn get_all_tasks(pool: &PgPool) -> Result<Vec<Task>, sqlx::Error> {
     sqlx::query_as::<_, Task>(
         "
         SELECT id, name, status, user_id, created_at, updated_at
@@ -124,7 +114,7 @@ pub async fn update_task_status_for_user(
     pool: &PgPool,
     req: UpdateTaskRequest,
     id_task: i32,
-    id_user: i32
+    id_user: i32,
 ) -> Result<bool, sqlx::Error> {
     let status: Option<String> = req.status.map(String::from);
 
@@ -147,10 +137,7 @@ pub async fn update_task_status_for_user(
     Ok(result.rows_affected() == 1)
 }
 
-pub async fn delete_task(
-    pool: &PgPool,
-    id: i32
-) -> Result<bool, sqlx::Error> {
+pub async fn delete_task(pool: &PgPool, id: i32) -> Result<bool, sqlx::Error> {
     let result = sqlx::query(
         "
         DELETE FROM tasks
@@ -164,10 +151,7 @@ pub async fn delete_task(
     Ok(result.rows_affected() == 1)
 }
 
-pub async fn create_task(
-    pool: &PgPool,
-    task: CreateTaskRequest
-) -> Result<Task, sqlx::Error> {
+pub async fn create_task(pool: &PgPool, task: CreateTaskRequest) -> Result<Task, sqlx::Error> {
     let status: String = task.status.into();
 
     sqlx::query_as::<_, Task>(
