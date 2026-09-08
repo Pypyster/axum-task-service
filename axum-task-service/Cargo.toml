@@ -24,3 +24,5 @@ thiserror = "2.0.20"
 tokio = { version = "1.53.1", features = ["full"] }
 reqwest = { version = "0.13.4", features = ["json"] }
 tower = "0.5.3"
+tracing = "0.1.44"
+async-trait = "0.1.92"
