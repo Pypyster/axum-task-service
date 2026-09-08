@@ -1,0 +1,335 @@
+@baseUrl = http://localhost:3000
+
+# Примерные (фейковые) токены — безопасны для публикации
+@user1Token = <USER1_JWT_EXAMPLE>
+@adminToken = <ADMIN_JWT_EXAMPLE>
+@user3Token = <USER3_JWT_EXAMPLE>
+@user4Token = <USER4_JWT_EXAMPLE>
+
+### Регистрация пользователя 1 — Alex
+POST {{baseUrl}}/register
+Content-Type: application/json
+
+{
+  "name": "Alex",
+  "phone": "+375295555555",
+  "password": "alex-password",
+  "role": "user"
+}
+
+### Регистрация администратора — Merphy
+POST {{baseUrl}}/register
+Content-Type: application/json
+
+{
+  "name": "Merphy",
+  "phone": "+375254444444",
+  "password": "SomeString",
+  "role": "admin"
+}
+
+### Регистрация Bob
+POST {{baseUrl}}/register
+Content-Type: application/json
+
+{
+  "name": "Bob",
+  "phone": "+375296666666",
+  "password": "bob-password",
+  "role": "user"
+}
+
+### Регистрация Alice
+POST {{baseUrl}}/register
+Content-Type: application/json
+
+{
+  "name": "Alice",
+  "phone": "+375297777777",
+  "password": "alice-password",
+  "role": "user"
+}
+
+### Логин Alex
+POST {{baseUrl}}/login
+Content-Type: application/json
+
+{
+  "phone": "+375295555555",
+  "password": "alex-password"
+}
+
+### Логин Merphy
+POST {{baseUrl}}/login
+Content-Type: application/json
+
+{
+  "phone": "+375254444444",
+  "password": "SomeString"
+}
+
+### Логин Bob
+POST {{baseUrl}}/login
+Content-Type: application/json
+
+{
+  "phone": "+375296666666",
+  "password": "bob-password"
+}
+
+### Логин Alice
+POST {{baseUrl}}/login
+Content-Type: application/json
+
+{
+  "phone": "+375297777777",
+  "password": "alice-password"
+}
+
+### Admin получает всех пользователей
+GET {{baseUrl}}/users
+Authorization: Bearer {{adminToken}}
+
+### Admin создаёт задачу Alex
+POST {{baseUrl}}/tasks
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "user_id": 1,
+  "name": "Задача Alex",
+  "status": "pending"
+}
+
+### Admin создаёт задачу Bob
+POST {{baseUrl}}/tasks
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "user_id": 3,
+  "name": "Задача Bob",
+  "status": "pending"
+}
+
+### Admin создаёт задачу Alice
+POST {{baseUrl}}/tasks
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "user_id": 4,
+  "name": "Задача Alice",
+  "status": "pending"
+}
+
+### Admin создаёт дополнительную задачу Alex для удаления
+POST {{baseUrl}}/tasks
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "user_id": 1,
+  "name": "Задача Alex для удаления",
+  "status": "pending"
+}
+
+### User не может создать задачу
+POST {{baseUrl}}/tasks
+Authorization: Bearer {{user1Token}}
+Content-Type: application/json
+
+{
+  "user_id": 1,
+  "name": "Запрещённая задача",
+  "status": "pending"
+}
+
+### Alex получает свои задачи
+GET {{baseUrl}}/tasks
+Authorization: Bearer {{user1Token}}
+
+### Bob получает свои задачи
+GET {{baseUrl}}/tasks
+Authorization: Bearer {{user3Token}}
+
+### Alice получает свои задачи
+GET {{baseUrl}}/tasks
+Authorization: Bearer {{user4Token}}
+
+### Admin получает все задачи
+GET {{baseUrl}}/tasks
+Authorization: Bearer {{adminToken}}
+
+### Alex получает свою задачу
+GET {{baseUrl}}/tasks/1
+Authorization: Bearer {{user1Token}}
+
+### Alice не может получить задачу Alex
+GET {{baseUrl}}/tasks/1
+Authorization: Bearer {{user4Token}}
+
+### Alice не может получить задачу Bob
+GET {{baseUrl}}/tasks/2
+Authorization: Bearer {{user4Token}}
+
+### Alex меняет статус своей задачи
+PUT {{baseUrl}}/tasks/1
+Authorization: Bearer {{user1Token}}
+Content-Type: application/json
+
+{
+  "status": "in_process"
+}
+
+### Alex меняет статус своей задачи на done
+PUT {{baseUrl}}/tasks/1
+Authorization: Bearer {{user1Token}}
+Content-Type: application/json
+
+{
+  "status": "done"
+}
+
+### Bob меняет статус своей задачи
+PUT {{baseUrl}}/tasks/2
+Authorization: Bearer {{user3Token}}
+Content-Type: application/json
+
+{
+  "status": "cancel"
+}
+
+### Alice меняет статус своей задачи
+PUT {{baseUrl}}/tasks/3
+Authorization: Bearer {{user4Token}}
+Content-Type: application/json
+
+{
+  "status": "in_process"
+}
+
+### User не может изменить имя своей задачи
+PUT {{baseUrl}}/tasks/1
+Authorization: Bearer {{user1Token}}
+Content-Type: application/json
+
+{
+  "name": "Запрещённое изменение имени"
+}
+
+### User не может изменить имя и статус своей задачи
+PUT {{baseUrl}}/tasks/1
+Authorization: Bearer {{user1Token}}
+Content-Type: application/json
+
+{
+  "name": "Запрещённое полное изменение",
+  "status": "cancel"
+}
+
+### User не может изменить статус чужой задачи
+PUT {{baseUrl}}/tasks/2
+Authorization: Bearer {{user1Token}}
+Content-Type: application/json
+
+{
+  "status": "done"
+}
+
+### User не может удалить свою задачу
+DELETE {{baseUrl}}/tasks/1
+Authorization: Bearer {{user1Token}}
+
+### User не может удалить чужую задачу
+DELETE {{baseUrl}}/tasks/2
+Authorization: Bearer {{user1Token}}
+
+### Admin получает задачу Alex
+GET {{baseUrl}}/tasks/1
+Authorization: Bearer {{adminToken}}
+
+### Admin получает задачу Bob
+GET {{baseUrl}}/tasks/2
+Authorization: Bearer {{adminToken}}
+
+### Admin получает задачу Alice
+GET {{baseUrl}}/tasks/3
+Authorization: Bearer {{adminToken}}
+
+### Admin полностью обновляет задачу Alex
+PUT {{baseUrl}}/tasks/1
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Задача Alex проверена",
+  "status": "done"
+}
+
+### Admin обновляет задачу Bob
+PUT {{baseUrl}}/tasks/2
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Задача Bob проверена",
+  "status": "done"
+}
+
+### Admin меняет статус задачи Alice
+PUT {{baseUrl}}/tasks/3
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "status": "cancel"
+}
+
+### Admin удаляет дополнительную задачу Alex
+DELETE {{baseUrl}}/tasks/4
+Authorization: Bearer {{adminToken}}
+
+### Admin получает все задачи после удаления
+GET {{baseUrl}}/tasks
+Authorization: Bearer {{adminToken}}
+
+### Admin не находит удалённую задачу
+GET {{baseUrl}}/tasks/4
+Authorization: Bearer {{adminToken}}
+
+### Admin не может удалить отсутствующую задачу
+DELETE {{baseUrl}}/tasks/999999
+Authorization: Bearer {{adminToken}}
+
+### User не может получить всех пользователей
+GET {{baseUrl}}/users
+Authorization: Bearer {{user1Token}}
+
+### User не может получить пользователя по id
+GET {{baseUrl}}/users/id/1
+Authorization: Bearer {{user1Token}}
+
+### User не может получить пользователя по телефону
+GET {{baseUrl}}/users/phone/%2B375295555555
+Authorization: Bearer {{user1Token}}
+
+### User не может удалить пользователя по id
+DELETE {{baseUrl}}/users/id/3
+Authorization: Bearer {{user1Token}}
+
+### User не может удалить пользователя по телефону
+DELETE {{baseUrl}}/users/phone/%2B375296666666
+Authorization: Bearer {{user1Token}}
+
+### Admin получает всех пользователей
+GET {{baseUrl}}/users
+Authorization: Bearer {{adminToken}}
+
+### Admin получает пользователя Bob по id
+GET {{baseUrl}}/users/id/3
+Authorization: Bearer {{adminToken}}
+
+### Admin получает пользователя Alice по телефону
+GET {{baseUrl}}/users/phone/%2B375297777777
+Authorization: Bearer {{adminToken}}
