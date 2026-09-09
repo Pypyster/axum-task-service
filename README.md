@@ -92,9 +92,9 @@ Handler возвращает HTTP 201 Created
 ## Структура проекта
 
 ```text
-axum-task-service/
-├── Cargo.toml
 ├── README.md
+├──axum-task-service/
+├── Cargo.toml
 └── src/
     ├── main.rs
     ├── db/
